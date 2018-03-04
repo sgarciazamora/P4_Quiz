@@ -176,6 +176,7 @@ exports.playCmd = rl =>{
             log(` No hay nada mas que preguntar.`);
             log(` Fin del examen. Aciertos:`);
             biglog(score, 'green');
+            biglog(`Fin`);
             rl.prompt();
 
         } else {
@@ -213,8 +214,8 @@ exports.playCmd = rl =>{
                 } else {
 
 
-                    colorize('Respuesta incorrecta', 'red');
-                    log('Su resultado es de :');
+                    log('INCORRECTO.');
+                    log('Fin del juego. Aciertos: '+ score);
                     biglog(score, 'green');
 
 
