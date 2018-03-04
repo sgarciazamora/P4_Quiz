@@ -78,10 +78,10 @@ exports.testCmd = (rl,id) =>{
 
                 if(resp.trim().toLowerCase()===solucion.toLowerCase()){
 
-                    log(` Su respuesta es:`);
+                    log(` Su respuesta es correcta.`);
                     biglog('CORRECTA','green');
                 }else{
-                    log(` Su respuesta es:`);
+                    log(` Su respuesta es incorrecta.`);
                     biglog('INCORRECTA','red');
                 };
                 rl.prompt();
