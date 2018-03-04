@@ -60,7 +60,7 @@ exports.testCmd = (rl,id) =>{
         try{
             const quiz = model.getByIndex(id);
 
-            rl.question(colorize( '¿'+ quiz.question+'?: ', 'red'), resp =>{
+            rl.question(colorize( quiz.question+'?: ', 'red'), resp =>{
 
                 let solucion = quiz.answer;
 
