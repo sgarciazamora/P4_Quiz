@@ -173,6 +173,7 @@ exports.deleteCmd =(rl,id)  =>{
            rl.prompt();
        });
 };
+
 /**
  * Edita el quiz indicado
  */
@@ -244,40 +245,70 @@ exports.playCmd = rl => {
     let orden = 0;
     let tamaño = 0;
     let toBeResolved = [];
-    let valoresAleatorios = [];
-    let quizzes = [];
 
     models.quiz.findAll()
         .each(quiz => {
-            tamaño = quiz.id;
-            quizzes [orden] = quiz;
+            toBeResolved [quiz.id-1]=quiz.id;
             orden++;
-
         })
-        .then(() => {
+        .then( playOne=() => {
+            let id = Math.floor(Math.random() * toBeResolved.length);
 
-            /**
-             * Creo el array de ids
-             */
-            for (var i = 0; i < tamaño; i++) {
+            validateId(id)
+                .then(id=> models.quiz.findById(toBeResolved[id]))
+                .then(quiz =>{
 
-                toBeResolved[i] = i + 1;
-            }
+                    return makeQuestion(rl, `${quiz.question} ?`)
+
+                        .then(resp => {
+                            let solucion = quiz.answer;
+
+                            solucion = solucion.replace(/á/gi, "a");
+                            solucion = solucion.replace(/é/gi, "e");
+                            solucion = solucion.replace(/í/gi, "i");
+                            solucion = solucion.replace(/ó/gi, "o");
+                            solucion = solucion.replace(/ú/gi, "u");
+
+                            resp = resp.replace(/á/gi, "a");
+                            resp = resp.replace(/é/gi, "e");
+                            resp = resp.replace(/í/gi, "i");
+                            resp = resp.replace(/ó/gi, "o");
+                            resp = resp.replace(/ú/gi, "u");
+
+                            if (resp.trim().toLowerCase() === solucion.toLowerCase()) {
+
+                                score++;
+                                log(' CORRECTO - Lleva ' + score + ' aciertos.');
+                                toBeResolved.splice(id,1);
+
+                            if(score<orden){
+                                playOne();
+
+                            }else{
+                                log(` No hay nada mas que preguntar.`);
+                                log(` Fin del examen. Aciertos:`);
+                                biglog(score, 'green');
+                                biglog(`Fin`);
+                                rl.prompt();
+                                return quiz;
+                            }
+                            }else{
+                                log('INCORRECTO.');
+                                log('Fin del juego. Aciertos: ' + score);
+                                biglog(score, 'green');
+                                rl.prompt();
+                            }
+
+                        })
+
+                        .then(()=> {
+                            rl.prompt();
+                        })
+                })
+                })
 
 
-            //Creo array con los quizzes en orden aleatorio
-
-            for (var i = 0; i < tamaño; i++) {
-                const id = Math.floor(Math.random() * quizzes.length);
-                 valoresAleatorios[i] = quizzes[id];
-                quizzes.splice(id, 1);
-            }
-
-
-            log(`Valor 'aleatorio' del array :`+ valoresAleatorios[1].answer); //cada vez me saca valor distinto
-            log(`Tamaño de quizzes.lenght :`+ quizzes.length);
-            })
-
+/**
         .then(()=> {
 
             var posicion = 0;
@@ -381,12 +412,12 @@ exports.playCmd = rl => {
 
                 })
 
-   */
+
 
             //rl.prompt();
             })
 
-
+*/
 
 
 
