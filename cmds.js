@@ -1,6 +1,6 @@
-
+const Sequelize = require('sequelize');
 const {log, biglog, errorlog, colorize} = require("./out");
-const model = require('./model');
+const {models} = require('./model');
 
 /**
  * Muestra la ayuda
@@ -24,42 +24,67 @@ exports.helpCmd = rl => {
  * Muestra todos los quizzes disponibles
  */
 exports.listCmd = rl => {
-    model.getAll().forEach((quiz, id) => {
-
-        log(` [${colorize(id, 'magenta')}]: ${quiz.question} `);
-    });
-    rl.prompt();
+    models.quiz.findAll()
+         .each(quiz => {
+        log(` [${colorize(quiz.id, 'magenta')}]: ${quiz.question}`);
+     })
+        .catch(error => {
+            errorlog(error.message);
+        })
+        .then(() => {
+            rl.prompt();
+        });
 };
+
+const validateId = id=> {
+
+    return new Sequelize.Promise((resolve, reject) => {
+        if (typeof id === "undefined") {
+            reject(new Error(`Falta el parámetro <id>,`));
+        } else {
+            id = parseInt (id);
+            if (Number.isNaN(id)) {
+                reject(new Error(`El valor del parámetro <id> no es un número.`));
+            } else {
+                resolve(id);
+            }
+        }
+    });
+};
+
 /**
  * Muestra el quiz indicado
  */
 exports.showCmd = (rl, id) => {
+    validateId(id)
+        .then(id => models.quiz.findById(id))
+        .then(quiz => {
+            if (!quiz) {
+                throw new Error(`No existe un quiz asociado al id=${id}.`);
+            }
+            log(` [${colorize(quiz.id, 'magenta')}]: ${quiz.question} ${colorize('=>', 'magenta')} ${quiz.answer}`);
 
-    if (typeof id === "undefined") {
-        errorlog(`Falta el parámetro id.`);
-    }else {
-        try{
-            const quiz = model.getByIndex(id);
-            log(` [${colorize(id, `magenta`)}]:  ${quiz.question} ${colorize('=>', 'magenta')} ${quiz.answer}`);
-        }catch(error) {
+        })
+        .catch(error => {
             errorlog(error.message);
-        }
-    }
-
-    rl.prompt();
+        })
+        .then(() => {
+            rl.prompt();
+        });
 };
 /**
  * Prueba el quiz indicado
  */
-exports.testCmd = (rl,id) =>{
+exports.testCmd = (rl,id) => {
 
-    if (typeof id === "undefined") {
-        errorlog(`Falta el parámetro id.`);
-        rl.prompt();
-    }else{
-        try{
-            const quiz = model.getByIndex(id);
 
+    validateId(id)
+
+    .then(id => models.quiz.findById(id))
+        .then(quiz => {
+            if (!quiz) {
+                throw new Error(`No existe un quiz asociado al id=${id}.`);
+            }
             rl.question(colorize( quiz.question+'?: ', 'red'), resp =>{
 
                 let solucion = quiz.answer;
@@ -86,151 +111,356 @@ exports.testCmd = (rl,id) =>{
                 };
                 rl.prompt();
             });
-        }catch (error) {
 
+        })
+        .catch(error => {
             errorlog(error.message);
+        })
+        .then(() => {
             rl.prompt();
-        };
-    };
+        });
+};
+
+
+const makeQuestion = (rl, text)=> {
+    return new Sequelize.Promise((resolve, reject)=> {
+        rl.question(colorize(text,'red'), answer => {
+            resolve(answer.trim());
+        });
+    });
 };
 /**
  * Añade un quiz a la lista
  */
-exports.addCmd = rl =>{
+exports.addCmd = rl => {
 
-    rl.question(colorize(' Introduzca una pregunta: ', 'red'), question => {
-        rl.question(colorize(' Introduzca la respuesta: ', 'red'), answer => {
-
-            model.add(question, answer);
+    makeQuestion(rl, 'Introduzca una pregunta: ')
+        .then(q => {
+            return makeQuestion(rl, 'Introduzca la respuesta: ')
+                .then(a => {
+                    return {question: q, answer: a};
+                });
+        })
+        .then(quiz => {
+            return models.quiz.create(quiz);
+        })
+        .then((quiz) => {
             log(` ${colorize('Se ha añadido', 'magenta')}: ${question} ${colorize('=>', 'magenta')} ${answer}`);
+        })
+        .catch(Sequelize.ValidationError, error => {
+            errorlog(`El quiz es erróneo:`);
+            error.errors.forEach(({message}) => errorlog(message));
+        })
+        .catch(error => {
+            errorlog(error.message);
+        })
+        .then(() => {
             rl.prompt();
-
         });
-    });
-
 };
+
 /**
  * Borra un quiz de la lista
  */
 exports.deleteCmd =(rl,id)  =>{
 
-    if (typeof id === "undefined") {
-        errorlog(`Falta el parámetro id.`);
-    }else {
-        try{
-            const quiz = model.deleteByIndex(id);
-
-        }catch(error) {
-            errorlog(error.message);
-        }
-    }
-
-    rl.prompt();
+   validateId(id)
+       .then(id => models.quiz.destroy({where: {id}}))
+       .catch(error => {
+           errorlog(error.message);
+       })
+       .then(() => {
+           rl.prompt();
+       });
 };
 /**
  * Edita el quiz indicado
  */
 exports.editCmd = (rl, id) =>{
-    if (typeof id === "undefined") {
-        errorlog(`Falta el parámetro id.`);
-        rl.prompt();
-    }else {
-        try {
-            const quiz = model.getByIndex(id);
-
-            process.stdout.isTTY && setTimeout(() => {rl.write(quiz.question)},0);
-
-            rl.question(colorize(' Introduzca una pregunta: ', 'red'), question => {
-
-                process.stdout.isTTY && setTimeout(() => {rl.write(quiz.answer)},0);
-
-                rl.question(colorize(' Introduzca la respuesta: ', 'red'), answer => {
-                    model.update(id, question, answer);
-                    log(` Se ha cambiado el quiz ${colorize(id, 'magenta')} por: ${question} ${colorize('=>', 'magenta')} ${answer}`);
-                    rl.prompt();
-                });
-            });
-        } catch (error) {
-            errorlog(error.message);
-            rl.prompt();
-        }
-    }
+  validateId(id)
+      .then(id=> models.quiz.findById(id))
+      .then(quiz => {
+          if(!quiz) {
+              throw new Error(`No existe un quiz asociado al id=${id}.`);
+          }
+          process.stdout.isTTY && setTimeout(() => {rl.write(quiz.question)}, 0);
+          return makeQuestion(rl, 'Introduzca la pregunta: ')
+              .then(q => {
+                  process.stdout.isTTY && setTimeout(() => {rl.write(quiz.answer)}, 0);
+                  return makeQuestion(rl, ' Introduzca la respuesta: ')
+                      .then(a => {
+                          quiz.question = q;
+                          quiz.answer = a;
+                          return quiz;
+                      });
+              });
+      })
+      .then(quiz => {
+          return quiz.save();
+      })
+      .then(quiz => {
+          log(` Se ha cambiado el quiz ${colorize(quiz.id, 'magenta')} por: ${quiz.question} ${colorize(' => ')} ${quiz.answer}`);
+      })
+      .catch(Sequelize.ValidationError, error => {
+          errorlog( 'El quiz es erróneo:');
+          error.errors.forEach(({message}) => errorlog(message));
+      })
+      .catch(error => {
+          errorlog(error.message);
+      })
+      .then(() => {
+          rl.prompt();
+      });
 };
+
+const numPreguntas = () =>  {
+
+    var tamaño=0;
+
+
+    const repetir=()=> {
+
+        tamaño=tamaño+1;
+        validateId(tamaño)
+            .then(id => models.quiz.findById(id))
+            .then(quiz => {
+
+                if (quiz) {
+                    tamaño=quiz.id;
+                    repetir();
+
+                }
+                return  parseInt(tamaño);
+            })
+    }
+
+};
+
 /**
  * Comienza el juego con los quizzes en orden aleatorio
  */
-exports.playCmd = rl =>{
-
+exports.playCmd = rl => {
     let score = 0;
+    let orden = 0;
+    let tamaño = 0;
     let toBeResolved = [];
-    for(var i=0; i<model.count(); i++ ){
+    let valoresAleatorios = [];
+    let quizzes = [];
 
-        toBeResolved[i]=i;
-    }
+    models.quiz.findAll()
+        .each(quiz => {
+            tamaño = quiz.id;
+            quizzes [orden] = quiz;
+            orden++;
 
-    const playOne = () => {
+        })
+        .then(() => {
 
+            /**
+             * Creo el array de ids
+             */
+            for (var i = 0; i < tamaño; i++) {
 
-        //CASO DE ARRAY VACÍO
-        if (toBeResolved.length === 0) {
-            log(` No hay nada mas que preguntar.`);
-            log(` Fin del examen. Aciertos:`);
-            biglog(score, 'green');
-            biglog(`Fin`);
-            rl.prompt();
-
-        } else {
-
-
-            const id = Math.floor(Math.random() * toBeResolved.length);
-
-
-            const quiz = model.getByIndex(toBeResolved[id]);
-            toBeResolved.splice(id, 1);
+                toBeResolved[i] = i + 1;
+            }
 
 
-            //ZONA DE RESPUESTAS
-            rl.question(colorize( '¿'+ quiz.question+'?: ', 'red'), resp =>{
+            //Creo array con los quizzes en orden aleatorio
 
-                let solucion = quiz.answer;
+            for (var i = 0; i < tamaño; i++) {
+                const id = Math.floor(Math.random() * quizzes.length);
+                 valoresAleatorios[i] = quizzes[id];
+                quizzes.splice(id, 1);
+            }
 
-                solucion = solucion.replace(/á/gi,"a");
-                solucion = solucion.replace(/é/gi,"e");
-                solucion = solucion.replace(/í/gi,"i");
-                solucion = solucion.replace(/ó/gi,"o");
-                solucion = solucion.replace(/ú/gi,"u");
 
-                resp = resp.replace(/á/gi,"a");
-                resp = resp.replace(/é/gi,"e");
-                resp = resp.replace(/í/gi,"i");
-                resp = resp.replace(/ó/gi,"o");
-                resp = resp.replace(/ú/gi,"u");
+            log(`Valor 'aleatorio' del array :`+ valoresAleatorios[1].answer); //cada vez me saca valor distinto
+            log(`Tamaño de quizzes.lenght :`+ quizzes.length);
+            })
 
-                if (resp.trim().toLowerCase()===solucion.toLowerCase()) {
-                    score++;
-                    log(' CORRECTO - Lleva ' + score + ' aciertos.');
-                    playOne();
+        .then(()=> {
+
+            var posicion = 0;
+            models.quiz.findAll()
+                .each(quiz => {
+
+
+                        let solucion = valoresAleatorios[quiz.id - 1].answer;
+                        rl.question(colorize('¿' + valoresAleatorios[quiz.id - 1].question + '?: ', 'red'), resp => {
+
+
+                            solucion = solucion.replace(/á/gi, "a");
+                            solucion = solucion.replace(/é/gi, "e");
+                            solucion = solucion.replace(/í/gi, "i");
+                            solucion = solucion.replace(/ó/gi, "o");
+                            solucion = solucion.replace(/ú/gi, "u");
+
+                            resp = resp.replace(/á/gi, "a");
+                            resp = resp.replace(/é/gi, "e");
+                            resp = resp.replace(/í/gi, "i");
+                            resp = resp.replace(/ó/gi, "o");
+                            resp = resp.replace(/ú/gi, "u");
+
+                            if (resp.trim().toLowerCase() === solucion) {
+
+                                score++;
+                                log(' CORRECTO - Lleva ' + score + ' aciertos.');
+                                playOne();
+
+
+                            } else {
+
+
+                                log('INCORRECTO.');
+                                log('Fin del juego. Aciertos: ' + score);
+                                biglog(score, 'green');
+                                rl.prompt();
+
+
+                            }
+
+                            if (quiz.id === 4) {
+                                log(` No hay nada mas que preguntar.`);
+                                log(` Fin del examen. Aciertos:`);
+                                biglog(score, 'green');
+                                biglog(`Fin`);
+                                rl.prompt();
+                            }
+
+
+                        })
+
+
+                        posicion++;
+
+                })
+/**
+                let solucion = valoresAleatorios[i].answer;
+
+                rl.question(colorize('¿' + valoresAleatorios[i].question + '?: ', 'red'), resp => {
+
+
+
+                    solucion = solucion.replace(/á/gi, "a");
+                    solucion = solucion.replace(/é/gi, "e");
+                    solucion = solucion.replace(/í/gi, "i");
+                    solucion = solucion.replace(/ó/gi, "o");
+                    solucion = solucion.replace(/ú/gi, "u");
+
+                    resp = resp.replace(/á/gi, "a");
+                    resp = resp.replace(/é/gi, "e");
+                    resp = resp.replace(/í/gi, "i");
+                    resp = resp.replace(/ó/gi, "o");
+                    resp = resp.replace(/ú/gi, "u");
+
+                    if (resp.trim().toLowerCase() === solucion.toLowerCase()) {
+                        score++;
+                        log(' CORRECTO - Lleva ' + score + ' aciertos.');
+                        // playOne();
+
+
+                    } else {
+
+
+                        log('INCORRECTO.');
+                        log('Fin del juego. Aciertos: ' + score);
+                        biglog(score, 'green');
+                        rl.prompt();
+
+
+                    }
+
+                    if (i === valoresAleatorios.length - 1) {
+                        log(` No hay nada mas que preguntar.`);
+                        log(` Fin del examen. Aciertos:`);
+                        biglog(score, 'green');
+                        biglog(`Fin`);
+                        rl.prompt();
+                    }
+
+
+                })
+
+   */
+
+            //rl.prompt();
+            })
+
+
+
+
+
+};
+
+
+       /**         log(`Paso el playone`)
+                //CASO DE ARRAY VACÍO
+                if (toBeResolved.length === 0) {
+                    log(` No hay nada mas que preguntar.`);
+                    log(` Fin del examen. Aciertos:`);
+                    biglog(score, 'green');
+                    biglog(`Fin`);
+                    rl.prompt();
 
                 } else {
 
 
-                    log('INCORRECTO.');
-                    log('Fin del juego. Aciertos: '+ score);
-                    biglog(score, 'green');
+                    log(`Paso el else`)
+                    const id = Math.floor(Math.random() * toBeResolved.length);
 
+
+                    const quiz = models.getByIndex(toBeResolved[id]);
+                    toBeResolved.splice(id, 1);
+
+
+                    //ZONA DE RESPUESTAS
+                    rl.question(colorize('¿' + quiz.question + '?: ', 'red'), resp => {
+
+                        let solucion = quiz.answer;
+
+                        solucion = solucion.replace(/á/gi, "a");
+                        solucion = solucion.replace(/é/gi, "e");
+                        solucion = solucion.replace(/í/gi, "i");
+                        solucion = solucion.replace(/ó/gi, "o");
+                        solucion = solucion.replace(/ú/gi, "u");
+
+                        resp = resp.replace(/á/gi, "a");
+                        resp = resp.replace(/é/gi, "e");
+                        resp = resp.replace(/í/gi, "i");
+                        resp = resp.replace(/ó/gi, "o");
+                        resp = resp.replace(/ú/gi, "u");
+
+                        if (resp.trim().toLowerCase() === solucion.toLowerCase()) {
+                            score++;
+                            log(' CORRECTO - Lleva ' + score + ' aciertos.');
+                            playOne();
+
+                        } else {
+
+
+                            log('INCORRECTO.');
+                            log('Fin del juego. Aciertos: ' + score);
+                            biglog(score, 'green');
+
+
+                        }
+                        rl.prompt();
+
+
+                    });
 
                 }
-                rl.prompt();
 
 
-            });
 
-        }
 
-    };
+        })
 
-    playOne();
-};
+        .catch(error => {
+            errorlog(error.message);
+        })
+
+}
 
 /**
  * Muestra los créditos
@@ -240,6 +470,7 @@ exports.creditsCmd = rl =>{
     log("Santiago García Zamora",'green');
     rl.prompt();
 };
+
 /**
  * Cierra el juego
  */
