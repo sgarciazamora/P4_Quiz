@@ -294,10 +294,8 @@ exports.playCmd = rl => {
                             }
                             }else{
                                 log('INCORRECTO.');
-                                log('Fin del juego. Aciertos: ' + score);
-                                biglog(`Fin`);
+                                log('Fin del juego. Aciertos: '+ score);
                                 biglog(score, 'green');
-                                rl.prompt();
                             }
 
                         })
