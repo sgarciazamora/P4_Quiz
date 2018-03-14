@@ -254,6 +254,15 @@ exports.playCmd = rl => {
         .then( playOne=() => {
             let id = Math.floor(Math.random() * toBeResolved.length);
 
+            if(toBeResolved.length===0){
+                log(` No hay nada mas que preguntar.`);
+                log(` Fin del examen. Aciertos:`);
+                biglog(score, 'green');
+                biglog(`Fin`);
+                rl.prompt();
+                return;
+            }
+
             validateId(id)
                 .then(id=> models.quiz.findById(toBeResolved[id]))
                 .then(quiz =>{
@@ -280,29 +289,18 @@ exports.playCmd = rl => {
                                 score++;
                                 log(' CORRECTO - Lleva ' + score + ' aciertos.');
                                 toBeResolved.splice(id,1);
-
-                            if(score<orden){
                                 playOne();
 
-                            }else{
-                                log(` No hay nada mas que preguntar.`);
-                                log(` Fin del examen. Aciertos:`);
-                                biglog(score, 'green');
-                                biglog(`Fin`);
-                                rl.prompt();
-                                return quiz;
-                            }
                             }else{
                                 log('INCORRECTO.');
                                 log('Fin del juego. Aciertos: '+ score);
                                 biglog(score, 'green');
+                                rl.prompt();
                             }
 
                         })
 
-                        .then(()=> {
-                            rl.prompt();
-                        })
+
                 })
                 })
 
