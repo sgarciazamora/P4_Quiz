@@ -122,7 +122,7 @@ exports.testCmd = (socket,rl,id) => {
 };
 
 
-const makeQuestion = (socket,rl, text)=> {
+const makeQuestion = (rl, text)=> {
     return new Sequelize.Promise((resolve, reject)=> {
         rl.question(colorize(text,'red'), answer => {
             resolve(answer.trim());
@@ -251,7 +251,7 @@ exports.playCmd = (socket,rl) => {
             toBeResolved [quiz.id-1]=quiz.id;
             orden++;
         })
-        .then( playOne = (socket) => {
+        .then( playOne = () => {
             let id = Math.floor(Math.random() * toBeResolved.length);
 
             if(toBeResolved.length===0){
